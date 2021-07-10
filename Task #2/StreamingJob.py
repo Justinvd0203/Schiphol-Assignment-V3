@@ -35,9 +35,10 @@ def createstream(spark):
         .readStream \
         .option("sep", ",") \
         .schema(routeschema) \
-        .csv("./tmp/text")
+        .csv("./tmp/input")
 
     data = lines.groupBy("Source airport ID").count().orderBy("count", ascending=False).limit(10)
+
     print(data)
 
     query = data \
@@ -46,41 +47,9 @@ def createstream(spark):
         .format("console") \
         .start()
 
-    # query = data \
-    #     .writeStream \
-    #     .outputMode("append") \
-    #     .format("csv") \
-    #     .option("path", "output/") \
-    #     .option("checkpointLocation", "checkpoint/") \
-    #     .start()
-
     query.awaitTermination()
-
-
-# def extractdata(spark, url):
-#     df = pd.read_csv(url,
-#                      names=["Airline", "Airline ID", "Source airport", "Source airport ID",
-#                             "Destination airport", "Destination airport ID", "Codeshare", "Stops", "Equipment"])
-#     df = df.replace(np.nan, "", regex=True)
-#
-#     data = spark.createDataFrame(df)
-#
-#     # print(df.head(5))
-#     # print(data)
-#
-#     return data
-
-
-# def analysedata(data):
-#     data = data.groupBy("Source airport ID").count().orderBy("count", ascending=False).limit(10)
-#     data.toPandas().to_csv("sample.csv", header=True)
-#
-#     # print(data.show())
 
 
 if __name__ == '__main__':
     sparkSession = createconnection()
     createstream(sparkSession)
-
-    # sparkDataframe = extractdata(sparkSession)
-    # analysedata(sparkDataframe)
