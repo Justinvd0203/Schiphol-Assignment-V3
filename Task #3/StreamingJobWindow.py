@@ -1,24 +1,32 @@
-import pyspark
-from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType
-from pyspark.sql.functions import window, col, lit, row_number
 import math
-
-from pyspark.sql import Window
-from pyspark.sql.functions import explode
-from pyspark.sql.functions import split
-
-import pandas as pd
-import numpy as np
 import os
 
-pd.set_option('display.max_columns', 35)
-pd.set_option('display.width', 250000)
+from pyspark.sql import SparkSession
+from pyspark.sql.types import StructType
+from pyspark.sql.functions import col, lit
 
+# Java Configuration
 os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-8-openjdk-amd64"
+
+# Schema for the structured dataframe (input data structure)
+routeschema = StructType().add("index", "integer").add("Airline", "string").add("Airline ID", "integer").add(
+    "Source airport",
+    "string").add(
+    "Source airport ID", "integer").add("Destination airport", "string").add("Destination airport ID",
+                                                                             "integer").add("Codeshare",
+                                                                                            "string").add(
+    "Stops", "integer").add("Equipment", "string")
+
+# The percentage of the window compared to the full length of the dataset
+window_percentage = 25
 
 
 def createconnection():
+    """
+    Function to connect to the spark instance, if the application does not exist yet it will be created.
+    Input: None
+    Output: SparkSession
+    """
     spark = SparkSession \
         .builder \
         .appName("StreamingJob") \
@@ -26,64 +34,89 @@ def createconnection():
     return spark
 
 
-def foreach_batch_function(df, epoch_id):
-    windows = []
-    for x in range(0, 68000, 17000):
-        print(x)
-        data = df.where(col('index').between(x, x + 17000))
+def analyse_data(df, rows):
+    """
+    Function to analyse the Streaming Dataframe data in set windows
+    Input:  - pyspark.sql.dataframe.DataFrame
+            - Dataframe row count
+    Output: pyspark.sql.dataframe.DataFrame
+    """
+    # Create List to store window dataframes
+    windowResults = []
+
+    # Create window size
+    window_size = math.ceil(window_percentage / 100 * rows)
+
+    # Loop to create windows over the Streaming Dataframe
+    for x in range(0, rows, window_size):
+        # Extract dataframe rows within the window
+        data = df.where(col('index').between(x, x + window_size))
+
+        # Add a window number so it can be used for sorting
         data = data.withColumn("windowNumber", lit(x))
-        data = data.withColumn("window", lit("[" + str(x) + "-" + str(x + 17000) + "]"))
+
+        # Add window buckets for a better description in the results dataset
+        data = data.withColumn("window", lit("[" + str(x) + "-" + str(x + window_size) + "]"))
+
+        # Perform data aggregation to get the top 10 used airports within this window
         data = data.groupBy("Source airport ID", "windowNumber", "window").count().orderBy(
             col("windowNumber").asc(),
             col("count").desc()).limit(10)
-        windows.append(data)
 
-    for i in windows[1:]:
-        windows[0] = windows[0].union(i)
+        # Append window result data to the list
+        windowResults.append(data)
 
-    windows[0].show(100)
+    # Append all results following the first into 1 big dataframe
+    for i in windowResults[1:]:
+        windowResults[0] = windowResults[0].union(i)
 
+    # Return the big dataframe :)
+    return windowResults[0]
+
+
+def batch_process(df, epoch_id):
+    """
+    Function to process each batch
+    Input:  - pyspark.sql.dataframe.DataFrame
+            - epoch_id, this is the batch number if i'm correct
+    Output: batch<batch_number>.csv file within the output directory
+    """
+    # Get general Df info (Can be used for debugging/logging/testing)
+    rows = df.count()
+
+    # Call function to analyse the data
+    results = analyse_data(df, rows)
+
+    # Save the results to a csv within ./output/batch directory with corresponding batch number
+    results.toPandas().to_csv("./output/batch" + str(epoch_id) + ".csv", header=True)
     pass
 
+
 def createstream(spark):
-    routeschema = StructType().add("index", "integer").add("Airline", "string").add("Airline ID", "integer").add(
-        "Source airport",
-        "string").add(
-        "Source airport ID", "integer").add("Destination airport", "string").add("Destination airport ID",
-                                                                                 "integer").add("Codeshare",
-                                                                                                "string").add(
-        "Stops", "integer").add("Equipment", "string")
+    """
+    Function to create input readStream and output writeStream
+    Input: Spark Session
+    Output: None
+    """
+    # Create input stream listening to .csv files within the directory ./tmp/input
     lines = spark \
         .readStream \
         .option("sep", ",") \
         .schema(routeschema) \
         .csv("./tmp/input")
 
-    # for x in range(0, 68000, 17000):
-    #     print(x)
-    #     data = lines.where(col('index').between(x, x + 17000))
-    #     data = data.withColumn("windowNumber", lit(x))
-    #     data = data.withColumn("window", lit("[" + str(x) + "-" + str(x + 17000) + "]"))
-    #     data = data.groupBy("Source airport ID", "windowNumber", "window").count().orderBy(
-    #         col("windowNumber").asc(),
-    #         col("count").desc()).limit(10)
-    #
-    #     query = data \
-    #         .writeStream \
-    #         .outputMode("complete") \
-    #         .format("console") \
-    #         .start()
-    #
-    # # I do know that they do not close/stop yet, I do not have an idea yet on how to fix that.
-    # query.awaitTermination()
-
+    # Create a write stream executing the foreach batch function batch_process()
     lines.writeStream \
         .outputMode("append") \
-        .foreachBatch(foreach_batch_function) \
+        .foreachBatch(batch_process) \
         .start() \
         .awaitTermination()
 
 
+# Start of the code
 if __name__ == '__main__':
+    # Connect to the spark docker instance
     sparkSession = createconnection()
+
+    # Create a spark structured stream
     createstream(sparkSession)
