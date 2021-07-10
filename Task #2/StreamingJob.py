@@ -39,8 +39,6 @@ def createstream(spark):
 
     data = lines.groupBy("Source airport ID").count().orderBy("count", ascending=False).limit(10)
 
-    print(data)
-
     query = data \
         .writeStream \
         .outputMode("complete") \
