@@ -1,7 +1,8 @@
 import pyspark
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType
-from pyspark.sql.functions import window, col, lit
+from pyspark.sql.functions import window, col, lit, row_number
+import math
 
 from pyspark.sql import Window
 from pyspark.sql.functions import explode
@@ -39,27 +40,38 @@ def createstream(spark):
         .schema(routeschema) \
         .csv("./tmp/input")
 
-    data = lines.where(col('index').between(0, 10))
-    data = data.withColumn("windowNumber", lit(1))
-    data = data.withColumn("window", lit("[0-10]"))
+    windows = []
 
-
-    data2 = lines.where(col('index').between(5, 15))
-    data2 = data2.withColumn("windowNumber", lit(2))
-    data2 = data2.withColumn("window", lit("[5-15]"))
-
-
-    output = data.union(data2)
-    output = output.groupBy("Source airport ID", "windowNumber", "window").count().orderBy(col("windowNumber").asc(),
-                                                                           col("count").desc()).limit(10)
-
-    query = output \
-        .writeStream \
-        .outputMode("complete") \
-        .format("console") \
-        .start()
-
+    for x in range(0, 68000, 34000):
+        print(x)
+        data = lines.where(col('index').between(x, x + 34000))
+        data = data.withColumn("windowNumber", lit(x))
+        data = data.withColumn("window", lit("[" + str(x) + "-" + str(x + 34000) + "]"))
+        data = data.groupBy("Source airport ID", "windowNumber", "window").count().orderBy(
+            col("windowNumber").asc(),
+            col("count").desc()).limit(10)
+        windows.append(data)
+        query = data \
+            .writeStream \
+            .outputMode("complete") \
+            .format("console") \
+            .start()
     query.awaitTermination()
+
+    # for i in windows[1:]:
+    #     windows[0] = windows[0].union(i)
+
+    # output = windows[0].groupBy("Source airport ID", "windowNumber", "window").count().orderBy(col("windowNumber").asc(),
+    #                                                                                        col("count").desc())
+
+    # query = output\
+    #     .writeStream \
+    #     .outputMode("complete") \
+    #     .format("console") \
+    #     .option("numRows", 50) \
+    #     .start()
+
+    # query.awaitTermination()
 
 
 if __name__ == '__main__':
