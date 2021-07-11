@@ -43,13 +43,13 @@ dataframe I converted NaN values to empty strings.
 ### Analyse and return dataset
 
 To analyse the data it had to be grouped and counted by Source Airport ID. After it had to be sorted and limited to 10
-values descending values. Finally, these results are saved in a .csv file using pandas.
+descending values. Finally, these results are saved in a .csv file using pandas:
 
 ![Image of local environment](/images/Analysis%20results.png)
 
 ## Task #2
 
-The difficult task here is to perform aggregation on a streaming dataset and return the analysis.
+The difficult task here is to perform aggregation on a streaming dataset and return the analysis real-time.
 
 To achieve this task 2 is divided into the following parts:
 
@@ -59,9 +59,9 @@ To achieve this task 2 is divided into the following parts:
 
 ### Create input stream
 
-The question here is how do we read the data? For this there are 2 options;
+The question here is how do we read the data? For this I came up with these 2 options;
 
-- Work with input from a certain port or HTTP request
+- Work with input from a certain port / HTTP request
 - Listen to a directory for CSV files
 
 After playing around with both options the better choice seemed to be to listen to a directory. Each time a .csv file is
@@ -69,8 +69,8 @@ added in this directory, a new batch will start and process/generate results. Fo
 better option, whilst working on a bigger server all the files that have to be processed can be placed within this
 certain directory. After successfully processing it would be a good idea to remove the input files.
 
-For this approach I made a structure corresponding to the expected csv input and added this to the readstream as a
-schema. This produced the following dataframe result within the stream:
+For this approach I made a structure/schema corresponding to the expected csv input and added this to the readstream as
+a schema. This produced the following dataframe result from the readStream:
 
 ![Image of readstream input](/images/Streaming%20input.png)
 
@@ -92,6 +92,8 @@ the directory:
 
 ![Image of data streaming output](/images/Streaming%20output%20results.png)
 
+**Adding another file in the input directory will make it run a new batch and process new results**
+
 ## Task #3
 
 ### Create window + interval
@@ -107,17 +109,18 @@ chosen to do this based on the index and the following code.
 ### Analyse and return batch data
 
 The ideal option is to split the dataframe into multiple windows, perform the aggregation and then union/join back
-together. However this caused the issue where multiple aggregations are not supported with streaming DataFrames. To
-solve this I used `foreachBatch()` within the writestream where I could perform multiple aggregations and save the data
-to a directory (This might not be the ideal option, but it worked).
+together within the Stream. However this caused the issue where multiple aggregations are not supported with streaming
+DataFrames. To work around this I used `foreachBatch()` within the writestream where I could perform multiple
+aggregations and save the data to a directory (This might not be the ideal option, but it worked).
 
 The results from this is that each batch of data produces a csv file in the output directory, for example adding a
-second .csv file in the input directory results into a "batch1.csv" file in the output directory.
+second .csv file in the input directory results into a "batch1.csv" file in the output directory next to the already
+existing batch0.csv
 
 It is also possible ofcourse to save every window analysis to a unique file, however I did not go for that option due to
 me overloading the output directory.
 
-I tested this concept and it gave the following results:
+I tested my method multiple times and it gave the following results:
 
 ![Image of window + interval testing](/images/Window_test.png)
 
@@ -126,10 +129,8 @@ better option however without any experience with Spark this is what I came up w
 the expected result.
 
 To be able to configure the window size and sliding interval I also added 2 field values where the user can change the
-window and slider size as a percentage of the total dataframe length (amount of rows).
-
-One thing to mention is that the slider size should be able to fit in whole integers within the window size for it to
-work properly.
+window and slider size as a percentage of the total dataframe length (amount of rows). One thing to mention here is that
+the slider size should be able to fit in whole integers within the window size for it to work properly.
 
 Eventually I ended up with the following .csv (./Task #4/output/batch0.csv) being generated with a 20% window size and
 10% sliding interval. (To test use `python3 StreamingJobWindow2.py` whilst in the correct directory)
