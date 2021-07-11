@@ -123,7 +123,7 @@ percentages of the file size. One thing to notice is that the slider size should
 the window size for it to work properly.
 
 Eventually I ended up with the following .csv (./Task #4/output/batch0.csv) being generated with a 20% window size and
-10% sliding interval.
+10% sliding interval. (To test use `python3 StreamingJobWindow2.py` whilst in the correct directory)
 
 ![Image of window + interval result](/images/WindowStreamResults.png)
 
@@ -145,7 +145,7 @@ were created by manually/visually analysing the mock data set.
 
 ### Run test
 
-At last the unit test could be executed using `pytest StreamingJobWindow2_test.py -s -v`
+At last the unit test could be executed using `pytest StreamingJobWindow2_test.py -s -v` whilst in the correct directory.
 
 ![Image of Unit test result](/images/Unit_test_results.png)
 
