@@ -18,7 +18,8 @@ routeschema = StructType().add("index", "integer").add("Airline", "string").add(
     "Stops", "integer").add("Equipment", "string")
 
 # The percentage of the window compared to the full length of the dataset
-window_percentage = 25
+window_percentage = 20
+sliding_percentage = 10
 
 
 def createconnection():
@@ -44,11 +45,15 @@ def analyse_data(df, rows):
     # Create List to store window dataframes
     windowResults = []
 
-    # Create window size
+    # Create window and sliding size
     window_size = math.ceil(window_percentage / 100 * rows)
+    sliding_size = math.floor(sliding_percentage / 100 * rows)
+
+    # Create max window start so windows do not go over length of the dataframe.
+    max_window_start = math.ceil(rows - (window_percentage / 100 * rows)) + math.ceil(rows / sliding_size)
 
     # Loop to create windows over the Streaming Dataframe
-    for x in range(0, rows, window_size):
+    for x in range(0, max_window_start, sliding_size):
         # Extract dataframe rows within the window
         data = df.where(col('index').between(x, x + window_size))
 

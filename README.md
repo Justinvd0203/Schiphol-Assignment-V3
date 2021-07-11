@@ -91,14 +91,16 @@ Therefore I went with the option to manually split it into multiple windows with
 Currently this caused the issue where multiple aggregations are not supported with streaming DataFrames. 
 To solve this I used `foreachBatch()` within the writestream where I could perform multiple aggregations and save the data to a directory.
 Each batch of data would give another csv file in the output directory, for example adding a .csv file in the input directory
-results into batch1.csv file in the output.
+results into batch1.csv file in the output. It is also possible ofcourse to save every window analysis to a unique file, however I did not go for that option.
 
-I tested this and it gave the following results:
+I tested this concept and it gave the following results:
 
 ![Image of window + interval testing](/images/Window_test.png)
 
 This show that my approach could work, therefore I continued with this method. I do still believe there could be a better option
 however without any experience with Spark this is what I came up with in the time that I had which gave the expected result.
 
+To be able to configure it I also added 2 field values where the user can change the window and slider size in percentages of the file size.
+One thing to notice is that the slider size should be able to fit in whole integers within the window size.
 
 ## Task #4
